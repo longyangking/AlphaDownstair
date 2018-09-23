@@ -2,7 +2,7 @@ import numpy as np
 
 class Block:
     def __init__(self, position, velocity, bound):
-        self.position = position
+        self.position = np.array(position)
         self.velocity = velocity
         self.bound = bound
 
@@ -22,9 +22,13 @@ class Block:
             return False
         return True
 
+    def set_height(self, height):
+        x, y = self.position
+        self.position = x, height
+
 class Target:
     def __init__(self, position, step, bound, size):
-        self.position = position
+        self.position = np.array(position)
         self.step = step
         self.bound = bound
         self.size = size
@@ -37,7 +41,7 @@ class Target:
         x0, y0 = self.position
         if y != y0:
             return False
-        if (x < x0 + self.size/2) and (x > x0 + self.size/2):
+        if (x < x0 + self.size/2) and (x > x0 - self.size/2):
             return True
         return False
 
@@ -50,13 +54,14 @@ class Target:
             direction = (-1, 0)
             self.__move(direction)
         elif code == 3:
-            self.position += (0, 1)     # Down stair
+            pass    # Down stair, do nothing but slide the stairs
             return True
 
         return False
 
     def __move(self, direction):
         x, y = self.position
+        direction = np.array(direction)
         x += direction[0]*self.step
 
         x_min, x_max = self.bound
@@ -75,11 +80,17 @@ class Stair:
     def get_block_position(self):
         return self.block.get_position()
 
+    def set_height(self, height):
+        self.height = height
+        self.block.set_height(height)
+
     def emit(self, is_start=False):
         x_min, x_max = self.bound
 
         v = np.random.random()
-        velocity = np.rint(velocity_max*v)
+        velocity = np.rint(self.velocity_max*v)
+        if velocity == 0:
+            velocity = 1    # Minimum speed
 
         if is_start:
             v = np.random.random()
@@ -123,7 +134,12 @@ class GameBoard:
         self.target = None
         self.stairs = list()
 
+        self.score = 0
+
         self.init()
+
+    def get_score(self):
+        return self.score
 
     def init(self):
         self.stairs.append(None)    # Blank block for first stair
@@ -143,7 +159,9 @@ class GameBoard:
 
     def generate_stair(self):
         stairs = list()
-        for i in range(self.n_stair-1):
+        for i in range(1, self.n_stair):
+            if self.stairs[i] is not None:
+                self.stairs[i].set_height(i-1)
             stairs.append(self.stairs[i])
 
         stair = Stair(
@@ -164,19 +182,91 @@ class GameBoard:
         board[int(x), int(y)] = 1
 
         for i in range(self.n_stair):
-            x, y = self.stairs[i].get_block_position()
-            if (x >= x_min) and (x < x_max):
-                board[int(x), int(y)] = -1
+            if self.stairs[i] is not None:
+                x, y = self.stairs[i].get_block_position()
+                if (x >= x_min) and (x < x_max):
+                    board[int(x), int(y)] = -1
 
         return board
 
     def play(self, code):
         is_down = self.target.action(code)
-        flag = False
-        for i in range(self.n_stair):
-            flag = flag or self.stairs[i].update(self.target)
-
         if is_down:
             self.generate_stair()
+            self.score += 1
+
+        flag = False
+        for i in range(self.n_stair):
+            if self.stairs[i] is not None:
+                flag = flag or self.stairs[i].update(self.target)
 
         return flag
+
+class DownStair:
+    def __init__(self, state_shape, ai=None, verbose=None):
+        self.state_shape = state_shape
+        self.ai = ai
+        self.verbose = verbose
+
+        self.gameboard= GameBoard(
+            state_shape=self.state_shape,
+            target_step=2, 
+            target_size=1, 
+            block_velocity_max=4
+        )
+        self.flag = False
+
+    def pressaction(self, code):
+        self.flag = self.gameboard.play(code=code)
+
+    def start(self):
+        from ui import UI
+
+        self.gameboard.init()
+
+        sizeunit = 20
+        area = self.gameboard.get_board()
+        ui = UI(pressaction=self.pressaction, area=area, sizeunit=sizeunit)
+        ui.start()
+
+        if self.verbose:
+            count = 0
+        
+        while not self.flag:
+            if self.verbose:
+                count += 1
+
+            ui.setarea(area=self.gameboard.get_board())
+        
+        ui.gameend(self.gameboard.get_score())
+
+        if self.verbose:
+            print("Game end with steps [{0}] and score [{1}].".format(count, self.gameboard.get_score()))
+
+    def pressaction_ai(self, code):
+        self.flag = self.gameboard.play(code=code)
+
+    def start_ai(self):
+        if self.verbose:
+            print("Start to play game by AI model...")
+
+        from ui import Viewer
+
+        self.gameboard.init()
+
+        sizeunit = 20
+        area = self.gameboard.get_board()
+        self.areas.append(area)
+        self.update_states()
+
+        viewer = Viewer(area=area, sizeunit=sizeunit)
+        viewer.start()
+        if self.verbose:
+            count = 0
+        
+        # TODO this part will be done after building the AI model
+        
+        viewer.gameend(self.gameengine.get_score())
+
+        if self.verbose:
+            print("Game end with steps [{0}] and score [{1}].".format(count, self.gameboard.get_score()))
