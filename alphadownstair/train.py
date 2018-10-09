@@ -1,5 +1,6 @@
 import numpy as np 
 from ai import AI
+from gameutils import GameBoard
 
 class SelfplayEngine:
     def __init__(self, ai, verbose=False):
@@ -29,18 +30,53 @@ class SelfplayEngine:
 
         self.states.append(state)
 
-    def start(self):
+    def start(self, epsilon=0.5, gamma=0.9):
         '''
         The main process of self-play training
         '''
 
         # TODO  It would be the key to define a appropriate action-value function, 
         #       which would be one of the main parts in this code project.
-        
+
+        gameboard= GameBoard(
+            state_shape=self.state_shape,
+            target_step=2, 
+            target_size=1, 
+            block_velocity_max=4
+        )
+        self.boards.append(gameboard.get_board())
+        self.update_states()
+
+        flag = False
+        while not flag:
+            state = gameboard.get_state()
+            action_code = self.ai.play(state)
+            flag = gameboard.play(code=action_code)
+
+            self.actions.append(action_code)
+            self.scores.append(gameboard.get_score())
+
+            if not flag:    # If game terminates, no data is needed to process
+                self.boards.append(gameboard.get_board())
+                self.update_states()
+
+        eps = 1e-12
         action_values = list()
+        N = len(self.scores)
+        for i in range(N):
+            action_value = self.ai.evaluate_function(self.state[-(i+1)])
+            action_code = self.actions[-(i+1)]
+            if i == 0:
+                action_value[action_code] = 0
+            else:
+                current_score = self.scores[-(i+1)]
+                if i+2 <= N:
+                    previous_score = self.scores[-(i+2)]
+                action_value[action_code] = current_score - previous_score
+            action_value = np.abs(action_value/np.sum(action_value + eps))
+            action_values.append(action_value)
 
         return self.states, action_values
-
 
 class TrainAI:
     def __init__(self, state_shape, action_dim=4, ai=None, verbose=False):

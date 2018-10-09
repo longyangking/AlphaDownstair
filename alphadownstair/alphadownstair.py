@@ -7,6 +7,7 @@ __info__ = "Play DownStair Game with AI"
 
 __default_board_shape__ = 30, 40
 __default_state_shape__ = *__default_board_shape__, 4
+__filename__ = "model.h5"
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__info__)
@@ -21,14 +22,19 @@ if __name__=='__main__':
     verbose = args.verbose
 
     if args.train:
-        print("Train AI")
-
-        # TODO Train AI model
+        print("Continue to train AI model for the game.")
 
     if args.retrain:
-        print("Re-train AI")
+        if verbose:
+            print("Re-train the AI model for the game.")
 
-        # TODO Re-train AI model
+        from train import TrainAI
+
+        trainai = TrainAI(state_shape=__default_state_shape__,verbose=verbose)
+        trainai.start(filename=__filename__)
+
+        if verbose:
+            print("The AI model is saved as the file [{0}].".format(__filename__))
 
     if args.playbyai:
         print("Play with AI!")

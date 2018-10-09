@@ -216,6 +216,25 @@ class DownStair:
         )
         self.flag = False
 
+        self.boards = list()
+        self.states = list()
+
+    def get_state(self):
+        return self.states[-1]
+
+    def update_states(self):
+        '''
+        update states
+        '''
+        Nx, Ny, channel = self.state_shape
+        state = np.zeros(self.state_shape)
+        n_boards = len(self.boards)
+        for i in range(self.channel):
+            if i+1 <= n_boards:
+                state[:,:,-(i+1)] = self.boards[-(i+1)]
+
+        self.states.append(state)
+
     def pressaction(self, code):
         self.flag = self.gameboard.play(code=code)
 
@@ -263,8 +282,16 @@ class DownStair:
         viewer.start()
         if self.verbose:
             count = 0
-        
-        # TODO this part will be done after building the AI model
+
+        flag = False
+        while not flag:
+            if self.verbose:
+                count += 1
+            
+            state = self.get_state()
+            action_code = self.ai.play(state)
+            flag = self.gameboard.play(code=action_code)
+            viewer.setarea(area=self.gameboard.get_board())
         
         viewer.gameend(self.gameengine.get_score())
 
